@@ -128,11 +128,13 @@ if __name__ == "__main__":
         alpha=0.75,
     )
     ax.set(title="Logistic equation solved with NNs", xlabel="t", ylabel="f(t)")
-    ax.legend()
+    ax.legend("Logistic equation solved with NNs")
+    plt.savefig('Logi.png')
 
     fig, ax = plt.subplots()
     ax.semilogy(loss_evolution)
     ax.set(title="Loss evolution", xlabel="# epochs", ylabel="Loss")
-    ax.legend()
+    ax.legend("Loss evolution")
 
     plt.show()
+    plt.savefig('Loss.png')
