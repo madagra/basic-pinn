@@ -7,7 +7,7 @@ from torch import nn
 import numpy as np
 import torchopt
 
-from pinn import make_forward_fn
+from pinn import make_forward_fn, LinearNN
 
 
 R = 1.0  # rate of maximum population growth parameterizing the equation
@@ -84,9 +84,8 @@ if __name__ == "__main__":
     domain = (-5.0, 5.0)
 
     # function versions of model forward, gradient and loss
-    fmodel, params, funcs = make_forward_fn(
-        num_hidden=num_hidden, dim_hidden=dim_hidden, derivative_order=1
-    )
+    model = LinearNN(num_layers=num_hidden, num_neurons=dim_hidden, num_inputs=1)
+    funcs = make_forward_fn(model, derivative_order=1)
 
     f = funcs[0]
     dfdx = funcs[1]
@@ -95,6 +94,9 @@ if __name__ == "__main__":
     # choose optimizer with functional API using functorch
     optimizer = torchopt.FuncOptimizer(torchopt.adam(lr=learning_rate))
 
+    # initial parameters randomly initialized
+    params = tuple(model.parameters())
+
     # train the model
     loss_evolution = []
     for i in range(num_iter):
@@ -102,8 +104,10 @@ if __name__ == "__main__":
         # sample points in the domain randomly for each epoch
         x = torch.FloatTensor(batch_size).uniform_(domain[0], domain[1])
 
-        # update the parameters
+        # compute the loss with the current parameters
         loss = loss_fn(params, x)
+
+        # update the parameters with functional optimizer
         params = optimizer.step(loss, params)
 
         print(f"Iteration {i} with loss {float(loss)}")
