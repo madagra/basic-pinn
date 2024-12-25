@@ -5,7 +5,7 @@ import torch
 from torch import nn
 import numpy as np
 
-from pinn import make_forward_fn, LinearNN
+from pinn import make_forward_fn_1d, LinearNN
 from plotting import plot_1d_solution
 from training import train_pinn
 
@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     # function versions of model forward, gradient and loss
     model = LinearNN(num_layers=num_hidden, num_neurons=dim_hidden, num_inputs=1)
-    funcs = make_forward_fn(model, derivative_order=1)
+    funcs = make_forward_fn_1d(model, derivative_order=1)
 
     f = funcs[0]
     dfdx = funcs[1]

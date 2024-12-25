@@ -13,6 +13,8 @@ def train_pinn(
     num_iter: int = 100,
 ) -> tuple[tuple[Tensor, ...], Tensor]:
 
+    print_every = num_iter // min(num_iter, 50)
+
     # choose optimizer with functional API using functorch
     optimizer = torchopt.FuncOptimizer(torchopt.adam(lr=learning_rate))
 
@@ -32,7 +34,9 @@ def train_pinn(
         # update the parameters with functional optimizer
         params = optimizer.step(loss, params)
 
-        print(f"Iteration {i} with loss {float(loss)}")
+        if i % print_every == 0:
+            print(f"Iteration {i} with loss {float(loss)}")
+        
         loss_evolution.append(float(loss))
 
     return params, loss_evolution
