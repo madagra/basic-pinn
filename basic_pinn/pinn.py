@@ -4,7 +4,7 @@ from typing import Callable
 
 import torch
 from torch import nn
-from torch.func import functional_call, grad, vmap, jacrev
+from torch.func import functional_call, grad, vmap
 
 
 @dataclass

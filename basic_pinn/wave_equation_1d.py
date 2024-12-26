@@ -3,7 +3,6 @@ import argparse
 
 import torch
 from torch import nn
-import matplotlib.pyplot as plt
 
 from pinn import make_forward_fn_nd, LinearNN, Config
 from training import train_pinn
