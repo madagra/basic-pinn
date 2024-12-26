@@ -1,0 +1,17 @@
+[project]
+name = "basic-pinn"
+version = "0.1.0"
+description = "Basic implementation of physics-informed neural networks for solving PDEs"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.10.0",
+    "torch==2.5.1",
+    "torchopt==0.7.3",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.391",
+    "ruff>=0.8.4",
+]

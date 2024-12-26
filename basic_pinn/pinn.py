@@ -1,9 +1,19 @@
 from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Callable
 
 import torch
 from torch import nn
-from torch.func import functional_call, grad, vmap
+from torch.func import functional_call, grad, vmap, jacrev
+
+
+@dataclass
+class Config:
+    num_hidden: int = 5
+    dim_hidden: int = 5
+    batch_size: int = 32
+    learning_rate: float = 1e-1
+    num_epochs: int = 100
 
 
 class LinearNN(nn.Module):
@@ -44,15 +54,33 @@ class LinearNN(nn.Module):
         # build the network
         self.network = nn.Sequential(*layers)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.network(x.reshape(-1, 1)).squeeze()
+    def forward(self, *inputs: tuple[torch.Tensor, ...]) -> torch.Tensor:
+        
+        if len(inputs) != self.num_inputs:
+            raise ValueError(f"Expected {self.num_inputs} inputs, got {len(inputs)}")
+        
+        if self.num_inputs == 1:
+            input = inputs[0]
+            return self.network(input.reshape(-1, 1)).squeeze()
+        else:
+
+            # NOTE
+            # when receiving vectors from the application of a grad
+            # higher-order function, the type of the tensor is slightly
+            # different and their shape is not defined. With these tensors, 
+            # stacking works on dimension 0, thus the definition
+            # of the `dim` variable below
+            dim = int(all([input.shape for input in inputs]))
+            
+            input = torch.stack(inputs, dim=dim)
+            return self.network(input).squeeze()
 
 
-def make_forward_fn(
+def make_forward_fn_1d(
     model: nn.Module,
     derivative_order: int = 1,
 ) -> list[Callable]:
-    """Make a functional forward pass and gradient functions given an input model
+    """Make a functional forward pass and gradient functions given an input model in 1-dimension
 
     This function creates a set of functional calls of the input model
 
@@ -106,6 +134,41 @@ def make_forward_fn(
     return fns
 
 
+def make_forward_fn_nd(
+    model: nn.Module,
+    on_variable: int,
+    derivative_order: int = 1,
+) -> list[Callable]:
+    """Make a functional forward pass and gradient functions given an input model in n-dimensions.
+
+    The parameters are exactly as the function above. The call to `grad` has been replaced with
+    a call to the reversed mode AD `jacrev` which computes the Jacobian of the function. Notice that
+    `jacrev` automatically supports batched inputs.
+    """
+
+    # notice that `functional_call` supports batched input by default
+    def f(*inputs: torch.Tensor, params: dict[str, torch.nn.Parameter] | tuple[torch.nn.Parameter, ...] = None) -> torch.Tensor:
+        if isinstance(params, tuple):
+            params_dict = tuple_to_dict_parameters(model, params)
+        else:
+            params_dict = params
+
+        return functional_call(model, params_dict, inputs)
+
+    fns = []
+    fns.append(f)
+
+    dfunc = f
+    for _ in range(derivative_order):
+        
+        dfunc = grad(dfunc, argnums=on_variable)
+        dfunc_vmap = vmap(dfunc)
+        
+        fns.append(dfunc_vmap)
+
+    return fns
+
+
 def tuple_to_dict_parameters(
         model: nn.Module, params: tuple[torch.nn.Parameter, ...]
 ) -> OrderedDict[str, torch.nn.Parameter]:
@@ -126,26 +189,3 @@ def tuple_to_dict_parameters(
     keys = list(dict(model.named_parameters()).keys())
     values = list(params)
     return OrderedDict(({k:v for k,v in zip(keys, values)}))
-
-
-if __name__ == "__main__":
-
-    # TODO: turn this into a unit test
-    
-    model = LinearNN(num_layers=2)
-    fns = make_forward_fn(model, derivative_order=2)
-
-    batch_size = 10
-    x = torch.randn(batch_size)
-    # params = dict(model.named_parameters())
-    params = dict(model.named_parameters())
-
-    fn_x = fns[0](x, params)
-    assert fn_x.shape[0] == batch_size
-
-    dfn_x = fns[1](x, params)
-    assert dfn_x.shape[0] == batch_size
-
-    ddfn_x = fns[2](x, params)
-    assert ddfn_x.shape[0] == batch_size
-
